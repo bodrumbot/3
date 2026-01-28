@@ -268,40 +268,41 @@ orderBtn.addEventListener('click', async () => {
 function getLocationAndFinish() {
   console.log('📍 Getting location...');
   
-  // Show loading
-  cartList.innerHTML = '<div class="loader"></div>';
-  cartTotal.textContent = 'Joylashuv aniqlanmoqda...';
+  cartList.innerHTML = '<div style="padding: 20px; text-align: center;">⏳ Joylashuv aniqlanmoqda...</div>';
+  cartTotal.textContent = 'Iltimos kuting...';
   orderBtn.disabled = true;
   
+  // Agar 15 sekund ichida joylashuv olmasa, buyurtmani joylashuvsiz yuborish
+  const timeoutId = setTimeout(() => {
+    console.warn('⏱️ Joylashuv olish vaqti tugadi');
+    finishOrder(null);
+  }, 15000);
+  
   if (!navigator.geolocation) {
-    console.warn('⚠️ Geolocation not supported');
+    clearTimeout(timeoutId);
     finishOrder(null);
     return;
   }
   
-  const timeoutId = setTimeout(() => {
-    console.warn('⚠️ Location timeout');
-    finishOrder(null);
-  }, 10000); // 10 seconds timeout
-  
   navigator.geolocation.getCurrentPosition(
-    position => {
+    (position) => {
       clearTimeout(timeoutId);
-      console.log('✅ Location obtained:', position.coords.latitude, position.coords.longitude);
+      console.log('✅ Location success:', position.coords);
       finishOrder({
         lat: position.coords.latitude,
         lng: position.coords.longitude
       });
     },
-    error => {
+    (error) => {
       clearTimeout(timeoutId);
-      console.warn('⚠️ Location error:', error.message);
+      console.warn('⚠️ Location error:', error);
+      // Joylashuv xatoligida ham buyurtmani yuborish
       finishOrder(null);
     },
     {
-      enableHighAccuracy: true,
-      timeout: 8000,
-      maximumAge: 0
+      enableHighAccuracy: false, // true o'rniga false qilish tezroq ishlaydi
+      timeout: 10000,
+      maximumAge: 60000
     }
   );
 }
