@@ -1,4 +1,4 @@
-// ========== 1. MAHSULOTLAR (STATIC) ==========
+// ---------- 1. MAHSULOTLAR ----------
 const menu = [
   { id: 1, name: 'Klyukva-Burger kombo',  price: 64000, img: 'https://i.ibb.co/sJtWCn5M/images-1.jpg' },
   { id: 2, name: 'Klyukva-Lavash kombo',  price: 59000, img: 'https://i.ibb.co/sJtWCn5M/images-1.jpg' },
@@ -6,7 +6,7 @@ const menu = [
   { id: 4, name: 'Klyukva-Burger',        price: 44000, img: 'https://i.ibb.co/sJtWCn5M/images-1.jpg' },
 ];
 
-// ========== 2. PROFIL (INDEXEDDB) ==========
+// ---------- 2. INDEXEDDB (profil) ----------
 const DB_NAME = 'bodrumDB';
 const STORE_PROFILE = 'profile';
 
@@ -34,7 +34,17 @@ async function getProfileDB() {
   return tx.objectStore(STORE_PROFILE).get(1);
 }
 
-// ========== 3. TAB SWITCH ==========
+// ---------- 3. LOCALSTORAGE (savat) ----------
+const CART_KEY = 'bodrum_cart';
+function saveCartLS() {
+  localStorage.setItem(CART_KEY, JSON.stringify(cart));
+}
+function loadCartLS() {
+  const raw = localStorage.getItem(CART_KEY);
+  cart = raw ? JSON.parse(raw) : [];
+}
+
+// ---------- 4. TAB SWITCH ----------
 document.querySelectorAll('.tab').forEach(btn =>
   btn.addEventListener('click', () => {
     document.querySelectorAll('.tab, .tab-content').forEach(el => el.classList.remove('active'));
@@ -43,16 +53,18 @@ document.querySelectorAll('.tab').forEach(btn =>
   })
 );
 
-// ========== 4. CART ==========
-const menuGrid = document.getElementById('menuGrid');
-const cartList = document.getElementById('cartList');
-const cartBadge = document.getElementById('cartBadge');
-const cartTotal = document.getElementById('cartTotal');
-const orderBtn = document.getElementById('orderBtn');
+// ---------- 5. CART ----------
+const menuGrid   = document.getElementById('menuGrid');
+const cartList   = document.getElementById('cartList');
+const cartBadge  = document.getElementById('cartBadge');
+const cartTotal  = document.getElementById('cartTotal');
+const orderBtn   = document.getElementById('orderBtn');
 
 let cart = [];
+loadCartLS(); // sahifa yuklanganida savatni tiklash
+renderCart(); // ko‘rsatish
 
-// --- render menu ---
+// --- menyu ---
 menu.forEach(item => {
   const card = document.createElement('div');
   card.className = 'card';
@@ -68,10 +80,11 @@ menu.forEach(item => {
 // --- add to cart ---
 menuGrid.addEventListener('click', e => {
   if (e.target.classList.contains('add-btn-only')) {
-    const id = +e.target.dataset.id;
+    const id   = +e.target.dataset.id;
     const product = menu.find(p => p.id === id);
     const exist = cart.find(c => c.id === id);
     exist ? exist.qty++ : cart.push({ ...product, qty: 1 });
+    saveCartLS();
     renderCart();
   }
 });
@@ -114,12 +127,11 @@ cartList.addEventListener('click', e => {
   if (act === '+') cart[idx].qty++;
   if (act === '-') cart[idx].qty = Math.max(1, cart[idx].qty - 1);
   if (e.target.closest('.cart-item-delete')) cart.splice(idx, 1);
+  saveCartLS();
   renderCart();
 });
 
-// ========== 5. BUYURTMA (direct to bot via WebApp) ==========
-// API manzili kerak emas, chunki buyurtma botga WebApp orqali yuboriladi
-
+// ---------- 6. BUYURTMA (WebApp orqali botga) ----------
 orderBtn.addEventListener('click', async () => {
   if (!cart.length) return alert('Savat bo‘sh!');
   const p = await getProfileDB();
@@ -154,18 +166,11 @@ async function finishOrder(location) {
   }
 }
 
-  // Telegram WebApp orqali botga yuborish
-  if (window.Telegram.WebApp) {
-    window.Telegram.WebApp.sendData(JSON.stringify(payload));
-  } else {
-    alert('Telegram orqali kirish majburiy!');
-  }
-
-// ========== 6. PROFIL MODAL ==========
-const profModal = document.getElementById('profModal');
-const modalName = document.getElementById('modalName');
+// ---------- 7. PROFIL MODAL ----------
+const profModal  = document.getElementById('profModal');
+const modalName  = document.getElementById('modalName');
 const modalPhone = document.getElementById('modalPhone');
-const modalSave = document.getElementById('modalSave');
+const modalSave  = document.getElementById('modalSave');
 
 function openProfModal() {
   profModal.classList.add('show');
@@ -175,7 +180,7 @@ async function closeProfModal() {
 }
 
 modalSave.addEventListener('click', async () => {
-  const name = modalName.value.trim();
+  const name  = modalName.value.trim();
   const phone = modalPhone.value.trim();
   if (!name || !phone) return alert('Iltimos, hammasini to‘ldiring!');
   await saveProfileDB({ name, phone });
@@ -183,14 +188,14 @@ modalSave.addEventListener('click', async () => {
   getLocationAndFinish();
 });
 
-// ========== 7. PROFIL TAB ==========
-document.getElementById('saveProf').addEventListener('click', async () => {
-  const name = document.getElementById('inpName').value.trim();
-  const phone = document.getElementById('inpPhone').value.trim();
-  if (!name || !phone) return alert('Iltimos, hammasini to‘ldiring!');
-  await saveProfileDB({ name, phone });
-  alert('✅ Saqlangan!');
-});
-
-// ========== 8. INIT ==========
-renderCart(); // sahifa yuklanganda savatni bo‘sh ko‘rsatadi
+// ---------- 8. PROFIL TAB (SAQLASH) ----------
+const saveProfBtn = document.getElementById('saveProf');
+if (saveProfBtn) {
+  saveProfBtn.addEventListener('click', async () => {
+    const name  = document.getElementById('inpName').value.trim();
+    const phone = document.getElementById('inpPhone').value.trim();
+    if (!name || !phone) return alert('Iltimos, hammasini to‘ldiring!');
+    await saveProfileDB({ name, phone });
+    alert('✅ Ma’lumotlar saqlandi!');
+  });
+}
