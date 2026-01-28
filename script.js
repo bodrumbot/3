@@ -142,15 +142,22 @@ orderBtn.addEventListener('click', async () => {
 function getLocationAndFinish() {
   cartList.innerHTML = '<div class="loader"></div>';
   cartTotal.textContent = 'Joylashuv aniqlanmoqda...';
-  if (!navigator.geolocation) return finishOrder(null);
+  if (!navigator.geolocation) {
+    finishOrder(null);          // ← faqat bitta chaqiruv
+    return;
+  }
   navigator.geolocation.getCurrentPosition(
     pos => finishOrder({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
-    () => finishOrder(null)
+    () => finishOrder(null),    // ← faqat bitta chaqiruv
+    { timeout: 8000 }           // 8 soniya kutish
   );
 }
 
+
 async function finishOrder(location) {
   const p = await getProfileDB();
+  if (!p) return; // xavfsizlik
+
   const payload = {
     name: p.name,
     phone: p.phone,
@@ -161,6 +168,7 @@ async function finishOrder(location) {
 
   if (window.Telegram.WebApp) {
     window.Telegram.WebApp.sendData(JSON.stringify(payload));
+    // WebApp avtomatik yopiladi → bot `web_app_data` oladi
   } else {
     alert('Telegram orqali kirish majburiy!');
   }
@@ -188,14 +196,34 @@ modalSave.addEventListener('click', async () => {
   getLocationAndFinish();
 });
 
-// ---------- 8. PROFIL TAB (SAQLASH) ----------
-const saveProfBtn = document.getElementById('saveProf');
-if (saveProfBtn) {
-  saveProfBtn.addEventListener('click', async () => {
-    const name  = document.getElementById('inpName').value.trim();
-    const phone = document.getElementById('inpPhone').value.trim();
-    if (!name || !phone) return alert('Iltimos, hammasini to‘ldiring!');
-    await saveProfileDB({ name, phone });
-    alert('✅ Ma’lumotlar saqlandi!');
-  });
+// ---------- TELEFON FORMATLASH ----------
+function formatPhone(raw) {
+  // faqat raqam olish
+  let digits = raw.replace(/\D/g, '');
+  if (digits.startsWith('998')) digits = digits.slice(3);
+  if (digits.length > 9) digits = digits.slice(0, 9);
+  return '+998' + digits;
 }
+
+// ---------- PROFIL TAB (SAQLASH) ----------
+document.getElementById('saveProf').addEventListener('click', async () => {
+  let name  = document.getElementById('inpName').value.trim();
+  let phone = document.getElementById('inpPhone').value.trim();
+
+  if (!name || !phone) return alert('Iltimos, hammasini to‘ldiring!');
+
+  phone = formatPhone(phone);                  // +998901234567
+  document.getElementById('inpPhone').value = phone; // ko‘rsatish uchun
+
+  await saveProfileDB({ name, phone });        // IndexedDB
+
+  // Telegram orqali serverga ham yuboramiz
+  if (window.Telegram.WebApp) {
+    window.Telegram.WebApp.sendData(JSON.stringify({
+      type: 'profile',
+      name: name,
+      phone: phone.replace('+998', '')          // serverda +998 qo‘shilmagan
+    }));
+  }
+  alert('✅ Ma’lumotlar saqlandi!');
+});
