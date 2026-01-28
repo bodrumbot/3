@@ -7,20 +7,12 @@ function initTelegram() {
     tg = window.Telegram.WebApp;
     isTelegramWebApp = true;
     
-    // Expand to full height
     tg.expand();
-    
-    // Enable closing confirmation
-    tg.enableClosingConfirmation();
-    
-    // Set header color
-    tg.setHeaderColor('#ff6600');
     
     console.log('✅ Telegram WebApp initialized');
     console.log('User:', tg.initDataUnsafe.user);
   } else {
     console.warn('⚠️ Not running in Telegram WebApp');
-    // Show warning to user
     showWarning();
   }
 }
@@ -48,10 +40,10 @@ initTelegram();
 
 // ---------- 1. MAHSULOTLAR ----------
 const menu = [
-  { id: 1, name: 'Klyukva-Burger kombo',  price: 64000, img: 'https://i.ibb.co/sJtWCn5M/images-1.jpg' },
-  { id: 2, name: 'Klyukva-Lavash kombo',  price: 59000, img: 'https://i.ibb.co/sJtWCn5M/images-1.jpg' },
+  { id: 1, name: 'Klyukva-Burger kombo', price: 64000, img: 'https://i.ibb.co/sJtWCn5M/images-1.jpg' },
+  { id: 2, name: 'Klyukva-Lavash kombo', price: 59000, img: 'https://i.ibb.co/sJtWCn5M/images-1.jpg' },
   { id: 3, name: 'Klyukva-Trindwich kombo', price: 62000, img: 'https://i.ibb.co/sJtWCn5M/images-1.jpg' },
-  { id: 4, name: 'Klyukva-Burger',        price: 44000, img: 'https://i.ibb.co/sJtWCn5M/images-1.jpg' },
+  { id: 4, name: 'Klyukva-Burger', price: 44000, img: 'https://i.ibb.co/sJtWCn5M/images-1.jpg' },
 ];
 
 // ---------- 2. INDEXEDDB ----------
@@ -128,11 +120,11 @@ document.querySelectorAll('.tab').forEach(btn =>
 );
 
 // ---------- 5. CART ----------
-const menuGrid   = document.getElementById('menuGrid');
-const cartList   = document.getElementById('cartList');
-const cartBadge  = document.getElementById('cartBadge');
-const cartTotal  = document.getElementById('cartTotal');
-const orderBtn   = document.getElementById('orderBtn');
+const menuGrid = document.getElementById('menuGrid');
+const cartList = document.getElementById('cartList');
+const cartBadge = document.getElementById('cartBadge');
+const cartTotal = document.getElementById('cartTotal');
+const orderBtn = document.getElementById('orderBtn');
 
 let cart = [];
 loadCartLS();
@@ -234,7 +226,7 @@ cartList.addEventListener('click', e => {
   renderCart();
 });
 
-// ---------- 6. ORDER ----------
+// ---------- 6. ORDER (YANGILANGAN) ----------
 orderBtn.addEventListener('click', async () => {
   if (!cart.length) {
     alert('Savat bo\'sh!');
@@ -242,122 +234,42 @@ orderBtn.addEventListener('click', async () => {
   }
   
   if (!isTelegramWebApp) {
-    alert('Bu ilova faqat Telegram bot orqali ishlaydi!\n\n1. Telegram botga o\'ting\n2. /start buyrug\'ini bosing\n3. "Buyurtma berish" tugmasini bosing');
+    alert('Bu ilova faqat Telegram bot orqali ishlaydi!');
     return;
   }
   
-  try {
-    const profile = await getProfileDB();
-    console.log('📋 Checking profile:', profile);
-    
-    if (!profile || !profile.name || !profile.phone) {
-      console.log('⚠️ Profile incomplete, showing modal');
-      openProfModal();
-      return;
-    }
-    
-    console.log('✅ Profile OK, getting location...');
-    getLocationAndFinish();
-  } catch (error) {
-    console.error('❌ Order button error:', error);
-    alert('Xatolik yuz berdi. Iltimos qaytadan urinib ko\'ring.');
+  const profile = await getProfileDB();
+  if (!profile || !profile.name || !profile.phone) {
+    alert('Iltimos avval profilni to\'ldiring!');
+    document.querySelector('[data-tab="profile"]').click();
+    return;
   }
+  
+  const total = cart.reduce((s, i) => s + i.price * i.qty, 0);
+  
+  // Buyurtma ma'lumotlarini tayyorlash va botga yuborish
+  const payload = {
+    action: 'prepare_order',
+    name: profile.name,
+    phone: profile.phone,
+    items: cart,
+    total: total
+  };
+  
+  console.log('📤 Sending order to bot:', payload);
+  
+  // Ma'lumotni botga yuborish
+  tg.sendData(JSON.stringify(payload));
+  
+  // WebApp ni yopish (bot endi chat orqali joylashuv so'raydi)
+  tg.close();
 });
 
-// ---------- GET LOCATION & SEND ORDER ----------
-function getLocationAndFinish() {
-  console.log('📍 Getting location...');
-  
-  cartList.innerHTML = '<div style="padding: 20px; text-align: center;">⏳ Joylashuv aniqlanmoqda...</div>';
-  cartTotal.textContent = 'Iltimos kuting...';
-  orderBtn.disabled = true;
-  
-  // Agar 15 sekund ichida joylashuv olmasa, buyurtmani joylashuvsiz yuborish
-  const timeoutId = setTimeout(() => {
-    console.warn('⏱️ Joylashuv olish vaqti tugadi');
-    finishOrder(null);
-  }, 15000);
-  
-  if (!navigator.geolocation) {
-    clearTimeout(timeoutId);
-    finishOrder(null);
-    return;
-  }
-  
-  navigator.geolocation.getCurrentPosition(
-    (position) => {
-      clearTimeout(timeoutId);
-      console.log('✅ Location success:', position.coords);
-      finishOrder({
-        lat: position.coords.latitude,
-        lng: position.coords.longitude
-      });
-    },
-    (error) => {
-      clearTimeout(timeoutId);
-      console.warn('⚠️ Location error:', error);
-      // Joylashuv xatoligida ham buyurtmani yuborish
-      finishOrder(null);
-    },
-    {
-      enableHighAccuracy: false, // true o'rniga false qilish tezroq ishlaydi
-      timeout: 10000,
-      maximumAge: 60000
-    }
-  );
-}
-
-async function finishOrder(location) {
-  try {
-    console.log('🚀 Finishing order...', location ? 'with location' : 'without location');
-    
-    const profile = await getProfileDB();
-    if (!profile) {
-      throw new Error('Profile not found');
-    }
-    
-    const total = cart.reduce((s, i) => s + i.price * i.qty, 0);
-    
-    const payload = {
-      name: profile.name,
-      phone: profile.phone,
-      items: cart,
-      total: total,
-      location: location ? `${location.lat},${location.lng}` : null
-    };
-    
-    console.log('📤 Sending data to bot:', payload);
-    
-    if (!isTelegramWebApp) {
-      throw new Error('Not in Telegram WebApp');
-    }
-    
-    // Send data to bot
-    tg.sendData(JSON.stringify(payload));
-    
-    console.log('✅ Data sent successfully');
-    
-    // Clear cart
-    cart = [];
-    saveCartLS();
-    
-    // Bot will close the WebApp automatically after receiving data
-    
-  } catch (error) {
-    console.error('❌ Finish order error:', error);
-    alert('Xatolik yuz berdi: ' + error.message);
-    
-    // Restore UI
-    renderCart();
-    orderBtn.disabled = false;
-  }
-}
-
 // ---------- 7. PROFILE MODAL ----------
-const profModal  = document.getElementById('profModal');
-const modalName  = document.getElementById('modalName');
+const profModal = document.getElementById('profModal');
+const modalName = document.getElementById('modalName');
 const modalPhone = document.getElementById('modalPhone');
-const modalSave  = document.getElementById('modalSave');
+const modalSave = document.getElementById('modalSave');
 
 function openProfModal() {
   profModal.classList.add('show');
@@ -369,7 +281,7 @@ function closeProfModal() {
 }
 
 modalSave.addEventListener('click', async () => {
-  const name  = modalName.value.trim();
+  const name = modalName.value.trim();
   const phone = modalPhone.value.trim();
   
   if (!name) {
@@ -385,14 +297,12 @@ modalSave.addEventListener('click', async () => {
   }
   
   try {
-    console.log('💾 Saving profile:', { name, phone });
     await saveProfileDB({ name, phone });
     closeProfModal();
-    console.log('✅ Profile saved, continuing order...');
-    getLocationAndFinish();
+    alert('✅ Profil saqlandi! Endi buyurtma berishingiz mumkin.');
   } catch (error) {
     console.error('❌ Save profile error:', error);
-    alert('Xatolik yuz berdi. Iltimos qaytadan urinib ko\'ring.');
+    alert('Xatolik yuz berdi.');
   }
 });
 
@@ -411,7 +321,7 @@ document.querySelector('[data-tab="profile"]').addEventListener('click', async (
 });
 
 saveProf.addEventListener('click', async () => {
-  const name  = inpName.value.trim();
+  const name = inpName.value.trim();
   const phone = inpPhone.value.trim();
   
   if (!name || !phone) {
@@ -427,7 +337,6 @@ saveProf.addEventListener('click', async () => {
   try {
     await saveProfileDB({ name, phone });
     
-    // Send to bot if in Telegram
     if (isTelegramWebApp) {
       tg.sendData(JSON.stringify({
         type: 'profile',
@@ -444,12 +353,12 @@ saveProf.addEventListener('click', async () => {
 });
 
 // Phone input formatting
-inpPhone.addEventListener('input', (e) => {
-  e.target.value = e.target.value.replace(/\D/g, '').slice(0, 9);
-});
-
-modalPhone.addEventListener('input', (e) => {
-  e.target.value = e.target.value.replace(/\D/g, '').slice(0, 9);
+[inpPhone, modalPhone].forEach(input => {
+  if (input) {
+    input.addEventListener('input', (e) => {
+      e.target.value = e.target.value.replace(/\D/g, '').slice(0, 9);
+    });
+  }
 });
 
 console.log('🎉 App initialized');
