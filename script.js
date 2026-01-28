@@ -72,7 +72,7 @@ async function saveProfileDB({ name, phone }) {
       tx.oncomplete = resolve;
       tx.onerror = reject;
     });
-    console.log('✅ Profile saved to IndexedDB');
+    console.log('✅ Profile saved');
   } catch (error) {
     console.error('❌ Error saving profile:', error);
     throw error;
@@ -88,10 +88,10 @@ async function getProfileDB() {
       req.onsuccess = () => resolve(req.result);
       req.onerror = () => reject(req.error);
     });
-    console.log('Profile from DB:', result);
+    console.log('Profile:', result);
     return result;
   } catch (error) {
-    console.error('❌ Error getting profile:', error);
+    console.error('❌ Error:', error);
     return null;
   }
 }
@@ -130,7 +130,7 @@ let cart = [];
 loadCartLS();
 renderCart();
 
-// --- Render menu ---
+// Menu render
 menu.forEach(item => {
   const card = document.createElement('div');
   card.className = 'card';
@@ -143,7 +143,7 @@ menu.forEach(item => {
   menuGrid.appendChild(card);
 });
 
-// --- Add to cart ---
+// Add to cart
 menuGrid.addEventListener('click', e => {
   if (e.target.classList.contains('add-btn-only')) {
     const id = +e.target.dataset.id;
@@ -158,11 +158,10 @@ menuGrid.addEventListener('click', e => {
     
     saveCartLS();
     renderCart();
-    console.log('➕ Added to cart:', product.name);
+    console.log('➕ Added:', product.name);
   }
 });
 
-// --- Render cart ---
 function renderCart() {
   cartList.innerHTML = '';
   let total = 0;
@@ -202,7 +201,7 @@ function renderCart() {
   cartTotal.textContent = `Umumiy: ${total.toLocaleString()} so'm`;
 }
 
-// --- Quantity control & delete ---
+// Cart controls
 cartList.addEventListener('click', e => {
   const idx = +e.target.dataset.idx;
   if (isNaN(idx)) return;
@@ -211,11 +210,8 @@ cartList.addEventListener('click', e => {
   if (act === '+') {
     cart[idx].qty++;
   } else if (act === '-') {
-    if (cart[idx].qty > 1) {
-      cart[idx].qty--;
-    } else {
-      cart.splice(idx, 1);
-    }
+    if (cart[idx].qty > 1) cart[idx].qty--;
+    else cart.splice(idx, 1);
   }
   
   if (e.target.closest('.cart-item-delete')) {
@@ -226,7 +222,7 @@ cartList.addEventListener('click', e => {
   renderCart();
 });
 
-// ---------- 6. ORDER (YANGILANGAN) ----------
+// ---------- 6. ORDER (TO'G'RILANGAN) ----------
 orderBtn.addEventListener('click', async () => {
   if (!cart.length) {
     alert('Savat bo\'sh!');
@@ -234,7 +230,7 @@ orderBtn.addEventListener('click', async () => {
   }
   
   if (!isTelegramWebApp) {
-    alert('Bu ilova faqat Telegram bot orqali ishlaydi!');
+    alert('Bu ilova faqat Telegram orqali!');
     return;
   }
   
@@ -247,7 +243,6 @@ orderBtn.addEventListener('click', async () => {
   
   const total = cart.reduce((s, i) => s + i.price * i.qty, 0);
   
-  // Buyurtma ma'lumotlarini tayyorlash va botga yuborish
   const payload = {
     action: 'prepare_order',
     name: profile.name,
@@ -256,16 +251,19 @@ orderBtn.addEventListener('click', async () => {
     total: total
   };
   
-  console.log('📤 Sending order to bot:', payload);
+  console.log('📤 Yuborilmoqda:', payload);
   
-  // Ma'lumotni botga yuborish
+  // Ma'lumot yuborish
   tg.sendData(JSON.stringify(payload));
   
-  // WebApp ni yopish (bot endi chat orqali joylashuv so'raydi)
-  tg.close();
+  // 🎯 MUHIM: 500ms kutish (ma'lumot yetib borishi uchun)
+  setTimeout(() => {
+    tg.close();
+  }, 500);
+  
 });
 
-// ---------- 7. PROFILE MODAL ----------
+// ---------- 7. PROFILE ----------
 const profModal = document.getElementById('profModal');
 const modalName = document.getElementById('modalName');
 const modalPhone = document.getElementById('modalPhone');
@@ -285,13 +283,13 @@ modalSave.addEventListener('click', async () => {
   const phone = modalPhone.value.trim();
   
   if (!name) {
-    alert('Iltimos, ismingizni kiriting!');
+    alert('Ismingizni kiriting!');
     modalName.focus();
     return;
   }
   
   if (!phone || phone.length !== 9) {
-    alert('Iltimos, to\'g\'ri telefon raqam kiriting! (9 ta raqam)');
+    alert('Telefon 9 ta raqam bo\'lishi kerak!');
     modalPhone.focus();
     return;
   }
@@ -299,19 +297,17 @@ modalSave.addEventListener('click', async () => {
   try {
     await saveProfileDB({ name, phone });
     closeProfModal();
-    alert('✅ Profil saqlandi! Endi buyurtma berishingiz mumkin.');
+    alert('✅ Profil saqlandi!');
   } catch (error) {
-    console.error('❌ Save profile error:', error);
     alert('Xatolik yuz berdi.');
   }
 });
 
-// ---------- 8. PROFILE TAB ----------
+// Profile tab
 const inpName = document.getElementById('inpName');
 const inpPhone = document.getElementById('inpPhone');
 const saveProf = document.getElementById('saveProf');
 
-// Load profile on tab switch
 document.querySelector('[data-tab="profile"]').addEventListener('click', async () => {
   const profile = await getProfileDB();
   if (profile) {
@@ -330,7 +326,7 @@ saveProf.addEventListener('click', async () => {
   }
   
   if (phone.length !== 9) {
-    alert('Telefon raqam 9 ta raqamdan iborat bo\'lishi kerak!');
+    alert('Telefon 9 ta raqamdan iborat bo\'lishi kerak!');
     return;
   }
   
@@ -345,14 +341,13 @@ saveProf.addEventListener('click', async () => {
       }));
     }
     
-    alert('✅ Ma\'lumotlar saqlandi!');
+    alert('✅ Saqlandi!');
   } catch (error) {
-    console.error('❌ Profile save error:', error);
-    alert('Xatolik yuz berdi!');
+    alert('Xatolik!');
   }
 });
 
-// Phone input formatting
+// Phone format
 [inpPhone, modalPhone].forEach(input => {
   if (input) {
     input.addEventListener('input', (e) => {
